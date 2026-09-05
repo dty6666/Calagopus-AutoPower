@@ -1,3 +1,4 @@
+```kotlin
 package com.keluarganaga.calagopusautopower
 
 import android.os.Bundle
@@ -7,12 +8,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -109,7 +110,6 @@ fun CalagopusApp() {
     }
 }
 
-
 @Composable
 fun LoginScreen(
     baseUrl: String,
@@ -203,13 +203,15 @@ fun LoginScreen(
 
                     try {
 
-                        val cleanUrl = baseUrl.trim().trimEnd('/')
+                        val cleanUrl =
+                            baseUrl.trim().trimEnd('/')
 
-                        val newClient = ApiClient(
-                            cleanUrl,
-                            username,
-                            password
-                        )
+                        val newClient =
+                            ApiClient(
+                                cleanUrl,
+                                username,
+                                password
+                            )
 
                         withContext(Dispatchers.IO) {
                             newClient.status()
@@ -251,7 +253,6 @@ fun LoginScreen(
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainShell(
@@ -261,16 +262,18 @@ fun MainShell(
 
     var tab by remember { mutableStateOf(0) }
 
-    val snackbar = remember {
-        SnackbarHostState()
-    }
+    val snackbar =
+        remember {
+            SnackbarHostState()
+        }
 
-    val tabs = listOf(
-        "Dashboard",
-        "Minecraft",
-        "Velocity",
-        "Settings"
-    )
+    val tabs =
+        listOf(
+            "Dashboard",
+            "Minecraft",
+            "Velocity",
+            "Settings"
+        )
 
     Scaffold(
 
@@ -301,14 +304,18 @@ fun MainShell(
 
                     NavigationBarItem(
 
-                        selected = tab == index,
+                        selected =
+                            tab == index,
 
                         onClick = {
                             tab = index
                         },
 
                         icon = {
-                            Text(title.first().toString())
+                            Text(
+                                title.first()
+                                    .toString()
+                            )
                         },
 
                         label = {
@@ -359,14 +366,11 @@ fun MainShell(
     }
 }
 
-
 @Composable
 fun DashboardScreen(
     client: ApiClient,
     snackbar: SnackbarHostState
 ) {
-
-    val scope = rememberCoroutineScope()
 
     var status by remember {
         mutableStateOf<JSONObject?>(null)
@@ -386,16 +390,20 @@ fun DashboardScreen(
 
             try {
 
-                val result = withContext(Dispatchers.IO) {
+                val result =
+                    withContext(Dispatchers.IO) {
 
-                    val newStatus = client.status()
-                    val newResources = client.resources()
+                        val newStatus =
+                            client.status()
 
-                    Pair(
-                        newStatus,
-                        newResources
-                    )
-                }
+                        val newResources =
+                            client.resources()
+
+                        Pair(
+                            newStatus,
+                            newResources
+                        )
+                    }
 
                 status = result.first
                 resources = result.second
@@ -403,7 +411,8 @@ fun DashboardScreen(
             } catch (e: Exception) {
 
                 snackbar.showSnackbar(
-                    e.message ?: "Connection failed"
+                    e.message
+                        ?: "Connection failed"
                 )
             }
 
@@ -414,7 +423,9 @@ fun DashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(
+                rememberScrollState()
+            )
             .padding(16.dp)
     ) {
 
@@ -424,7 +435,8 @@ fun DashboardScreen(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
 
             ActionButton(
@@ -471,7 +483,6 @@ fun DashboardScreen(
     }
 }
 
-
 @Composable
 fun RowScope.ActionButton(
     label: String,
@@ -481,7 +492,8 @@ fun RowScope.ActionButton(
     setBusy: (Boolean) -> Unit
 ) {
 
-    val scope = rememberCoroutineScope()
+    val scope =
+        rememberCoroutineScope()
 
     Button(
 
@@ -508,7 +520,8 @@ fun RowScope.ActionButton(
                 } catch (e: Exception) {
 
                     snackbar.showSnackbar(
-                        e.message ?: "Request failed"
+                        e.message
+                            ?: "Request failed"
                     )
 
                 } finally {
@@ -525,7 +538,6 @@ fun RowScope.ActionButton(
     }
 }
 
-
 @Composable
 fun StatusCard(
     status: JSONObject?
@@ -541,7 +553,8 @@ fun StatusCard(
 
             Text(
                 "Paper Server",
-                style = MaterialTheme.typography.titleLarge
+                style =
+                    MaterialTheme.typography.titleLarge
             )
 
             Spacer(Modifier.height(8.dp))
@@ -603,7 +616,6 @@ fun StatusCard(
     }
 }
 
-
 @Composable
 fun ResourceCard(
     resources: JSONObject?
@@ -622,7 +634,8 @@ fun ResourceCard(
 
             Text(
                 "Resources",
-                style = MaterialTheme.typography.titleLarge
+                style =
+                    MaterialTheme.typography.titleLarge
             )
 
             Spacer(Modifier.height(8.dp))
@@ -692,7 +705,6 @@ fun ResourceCard(
     }
 }
 
-
 @Composable
 fun ConsoleScreen(
     client: ApiClient,
@@ -700,7 +712,8 @@ fun ConsoleScreen(
     snackbar: SnackbarHostState
 ) {
 
-    val scope = rememberCoroutineScope()
+    val scope =
+        rememberCoroutineScope()
 
     var logs by remember {
 
@@ -755,7 +768,8 @@ fun ConsoleScreen(
 
             Text(
                 text = logs,
-                fontFamily = FontFamily.Monospace,
+                fontFamily =
+                    FontFamily.Monospace,
 
                 modifier = Modifier
                     .padding(10.dp)
@@ -770,8 +784,10 @@ fun ConsoleScreen(
             Spacer(Modifier.height(8.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
             ) {
 
                 OutlinedTextField(
@@ -790,7 +806,8 @@ fun ConsoleScreen(
                         Text("say Hello")
                     },
 
-                    modifier = Modifier.weight(1f)
+                    modifier =
+                        Modifier.weight(1f)
                 )
 
                 Button(
@@ -811,7 +828,9 @@ fun ConsoleScreen(
                             try {
 
                                 val result =
-                                    withContext(Dispatchers.IO) {
+                                    withContext(
+                                        Dispatchers.IO
+                                    ) {
                                         client.command(
                                             commandToSend
                                         )
@@ -842,14 +861,14 @@ fun ConsoleScreen(
     }
 }
 
-
 @Composable
 fun SettingsScreen(
     client: ApiClient,
     snackbar: SnackbarHostState
 ) {
 
-    val scope = rememberCoroutineScope()
+    val scope =
+        rememberCoroutineScope()
 
     var config by remember {
         mutableStateOf<JSONObject?>(null)
@@ -904,7 +923,8 @@ fun SettingsScreen(
 
         Text(
             "Server configuration",
-            style = MaterialTheme.typography.headlineSmall
+            style =
+                MaterialTheme.typography.headlineSmall
         )
 
         Spacer(Modifier.height(12.dp))
@@ -997,7 +1017,8 @@ fun SettingsScreen(
                         )
                 }
 
-                values["idleMinutes"] = idle
+                values["idleMinutes"] =
+                    idle
 
                 values["startupTimeoutSeconds"] =
                     timeout
@@ -1013,7 +1034,9 @@ fun SettingsScreen(
                     try {
 
                         val result =
-                            withContext(Dispatchers.IO) {
+                            withContext(
+                                Dispatchers.IO
+                            ) {
                                 client.saveConfig(
                                     values
                                 )
@@ -1044,7 +1067,6 @@ fun SettingsScreen(
     }
 }
 
-
 @Composable
 fun SettingReadOnly(
     label: String,
@@ -1063,7 +1085,6 @@ fun SettingReadOnly(
 
     Spacer(Modifier.height(8.dp))
 }
-
 
 fun formatSeconds(
     value: Long
@@ -1093,7 +1114,6 @@ fun formatSeconds(
         )
     }
 }
-
 
 fun bytes(
     value: Long
@@ -1130,3 +1150,10 @@ fun bytes(
         units[index]
     )
 }
+```
+
+**Important:** When you paste this into GitHub, make sure the old `MainActivity.kt` is completely replaced—not appended to.
+
+Then **Commit changes → Actions → Build APK → Run workflow**.
+
+If the next build error says something about **`compileSdk 37` / Android SDK 37 not found**, we'll change `compileSdk` and `targetSdk` to **35** in `app/build.gradle.kts`, because your workflow currently installs Android API 35.
