@@ -1,14 +1,18 @@
-name: Inspect Calagopus ZIP
+name: Extract Calagopus Source
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  inspect:
+  extract:
+    name: Extract server source
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v5
 
       - name: Extract ZIP
@@ -17,26 +21,52 @@ jobs:
           mkdir extracted
           unzip -q CalagopusAutoPower.zip -d extracted
 
-      - name: Show project structure
+      - name: Prepare server source
         run: |
-          echo "===== FILES ====="
-          find extracted -type f | sort
+          rm -rf server-source
+          mkdir -p server-source
+
+          cp extracted/build.gradle server-source/ 2>/dev/null || true
+          cp extracted/settings.gradle server-source/ 2>/dev/null || true
+          cp extracted/README.md server-source/ 2>/dev/null || true
+
+          if [ -d extracted/src ]; then
+            cp -r extracted/src server-source/
+          fi
+
+          echo "=== SERVER SOURCE ==="
+          find server-source -type f | sort
+
+      - name: Show Gradle configuration
+        run: |
+          echo "===== build.gradle ====="
+          cat server-source/build.gradle 2>/dev/null || true
 
           echo
-          echo "===== GRADLE FILES ====="
-          find extracted -type f \( \
-            -name "build.gradle" \
-            -o -name "build.gradle.kts" \
-            -o -name "settings.gradle" \
-            -o -name "settings.gradle.kts" \
-            -o -name "gradle.properties" \
-            -o -name "gradlew" \
-          \) -print
+          echo "===== settings.gradle ====="
+          cat server-source/settings.gradle 2>/dev/null || true
 
-          echo
-          echo "===== ANDROID FILES ====="
-          find extracted -type f \( \
-            -name "AndroidManifest.xml" \
-            -o -name "*.kt" \
-            -o -name "*.java" \
-          \) | sort
+      - name: Show Java source
+        run: |
+          echo "===== CalagopusAutoPower.java ====="
+          cat server-source/src/main/java/com/keluarganaga/calagopusautopower/CalagopusAutoPower.java
+
+      - name: Upload extracted source
+        uses: actions/upload-artifact@v4
+        with:
+          name: calagopus-server-source
+          path: server-source/
+
+      - name: Commit extracted source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add server-source
+
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+          else
+            git commit -m "Extract CalagopusAutoPower server source"
+            git push
+          fi
