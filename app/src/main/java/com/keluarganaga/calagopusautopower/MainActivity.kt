@@ -7,19 +7,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -63,11 +61,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun CalagopusApp() {
 
-    var loggedIn by remember { mutableStateOf(false) }
+    var loggedIn by remember {
+        mutableStateOf(false)
+    }
 
-    var baseUrl by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var baseUrl by remember {
+        mutableStateOf("")
+    }
+
+    var username by remember {
+        mutableStateOf("")
+    }
+
+    var password by remember {
+        mutableStateOf("")
+    }
 
     var client by remember {
         mutableStateOf<ApiClient?>(null)
@@ -121,8 +129,13 @@ fun LoginScreen(
     onLoginSuccess: (ApiClient) -> Unit
 ) {
 
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf("") }
+    var loading by remember {
+        mutableStateOf(false)
+    }
+
+    var error by remember {
+        mutableStateOf("")
+    }
 
     val scope = rememberCoroutineScope()
 
@@ -130,6 +143,7 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
+
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -139,14 +153,18 @@ fun LoginScreen(
             style = MaterialTheme.typography.headlineMedium
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(
+            modifier = Modifier.height(8.dp)
+        )
 
         Text(
             text = "Server Control Panel",
             style = MaterialTheme.typography.bodyMedium
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(
+            modifier = Modifier.height(32.dp)
+        )
 
         OutlinedTextField(
             value = baseUrl,
@@ -161,7 +179,9 @@ fun LoginScreen(
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
 
         OutlinedTextField(
             value = username,
@@ -173,7 +193,9 @@ fun LoginScreen(
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
 
         OutlinedTextField(
             value = password,
@@ -186,7 +208,9 @@ fun LoginScreen(
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(
+            modifier = Modifier.height(20.dp)
+        )
 
         if (error.isNotEmpty()) {
 
@@ -196,7 +220,9 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(
+                modifier = Modifier.height(12.dp)
+            )
         }
 
         Button(
@@ -267,7 +293,6 @@ fun LoginScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainShell(
     client: ApiClient,
@@ -291,6 +316,7 @@ fun MainShell(
 
                     Text(
                         when (selectedTab) {
+
                             0 -> "Dashboard"
                             1 -> "Minecraft Console"
                             2 -> "Velocity Console"
@@ -371,14 +397,12 @@ fun MainShell(
                 )
 
                 1 -> ConsoleScreen(
-                    title = "Minecraft Console",
                     client = client,
                     minecraft = true,
                     snackbar = snackbar
                 )
 
                 2 -> ConsoleScreen(
-                    title = "Velocity Console",
                     client = client,
                     minecraft = false,
                     snackbar = snackbar
@@ -410,6 +434,10 @@ fun DashboardScreen(
 
     var loading by remember {
         mutableStateOf(true)
+    }
+
+    var actionBusy by remember {
+        mutableStateOf(false)
     }
 
     val scope = rememberCoroutineScope()
@@ -497,21 +525,94 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
 
-                ActionButton(
-                    label = "Start",
-                    path = "/api/start",
-                    client = client,
-                    snackbar = snackbar,
-                    setBusy = {}
-                )
+                Button(
+                    onClick = {
 
-                ActionButton(
-                    label = "Stop",
-                    path = "/api/stop",
-                    client = client,
-                    snackbar = snackbar,
-                    setBusy = {}
-                )
+                        actionBusy = true
+
+                        scope.launch {
+
+                            try {
+
+                                val result =
+                                    withContext(Dispatchers.IO) {
+                                        client.action("/api/start")
+                                    }
+
+                                snackbar.showSnackbar(
+                                    result.optString(
+                                        "message",
+                                        "Start requested."
+                                    )
+                                )
+
+                                refresh()
+
+                            } catch (e: Exception) {
+
+                                snackbar.showSnackbar(
+                                    e.message
+                                        ?: "Start failed."
+                                )
+
+                            } finally {
+
+                                actionBusy = false
+                            }
+                        }
+                    },
+
+                    enabled = !actionBusy,
+
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                ) {
+                    Text("Start")
+                }
+
+                Button(
+                    onClick = {
+
+                        actionBusy = true
+
+                        scope.launch {
+
+                            try {
+
+                                val result =
+                                    withContext(Dispatchers.IO) {
+                                        client.action("/api/stop")
+                                    }
+
+                                snackbar.showSnackbar(
+                                    result.optString(
+                                        "message",
+                                        "Stop requested."
+                                    )
+                                )
+
+                                refresh()
+
+                            } catch (e: Exception) {
+
+                                snackbar.showSnackbar(
+                                    e.message
+                                        ?: "Stop failed."
+                                )
+
+                            } finally {
+
+                                actionBusy = false
+                            }
+                        }
+                    },
+
+                    enabled = !actionBusy,
+
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Stop")
+                }
             }
         }
 
@@ -522,16 +623,53 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
 
-                ActionButton(
-                    label = "Save",
-                    path = "/api/save",
-                    client = client,
-                    snackbar = snackbar,
-                    setBusy = {}
-                )
+                Button(
+                    onClick = {
+
+                        actionBusy = true
+
+                        scope.launch {
+
+                            try {
+
+                                val result =
+                                    withContext(Dispatchers.IO) {
+                                        client.action("/api/save")
+                                    }
+
+                                snackbar.showSnackbar(
+                                    result.optString(
+                                        "message",
+                                        "Save requested."
+                                    )
+                                )
+
+                            } catch (e: Exception) {
+
+                                snackbar.showSnackbar(
+                                    e.message
+                                        ?: "Save failed."
+                                )
+
+                            } finally {
+
+                                actionBusy = false
+                            }
+                        }
+                    },
+
+                    enabled = !actionBusy,
+
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                ) {
+                    Text("Save")
+                }
 
                 Button(
                     onClick = {
+
+                        actionBusy = true
 
                         scope.launch {
 
@@ -551,19 +689,26 @@ fun DashboardScreen(
                                     )
                                 )
 
+                                refresh()
+
                             } catch (e: Exception) {
 
                                 snackbar.showSnackbar(
                                     e.message
                                         ?: "Reload failed."
                                 )
+
+                            } finally {
+
+                                actionBusy = false
                             }
                         }
                     },
 
-                    modifier = Modifier.weight(1f)
-                ) {
+                    enabled = !actionBusy,
 
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Reload")
                 }
             }
@@ -800,76 +945,28 @@ fun ResourceCard(
             )
 
             Text(
-                text = "Disk: ${formatBytes(disk)}"
+                text = "Disk: ${
+                    formatBytes(disk)
+                }"
             )
 
             Text(
-                text = "Network RX: ${formatBytes(rx)}"
+                text = "Network RX: ${
+                    formatBytes(rx)
+                }"
             )
 
             Text(
-                text = "Network TX: ${formatBytes(tx)}"
+                text = "Network TX: ${
+                    formatBytes(tx)
+                }"
             )
         }
     }
 }
 
 @Composable
-fun RowScope.ActionButton(
-    label: String,
-    path: String,
-    client: ApiClient,
-    snackbar: SnackbarHostState,
-    setBusy: (Boolean) -> Unit
-) {
-
-    val scope = rememberCoroutineScope()
-
-    Button(
-        onClick = {
-
-            setBusy(true)
-
-            scope.launch {
-
-                try {
-
-                    val result =
-                        withContext(Dispatchers.IO) {
-                            client.action(path)
-                        }
-
-                    snackbar.showSnackbar(
-                        result.optString(
-                            "message",
-                            "Done"
-                        )
-                    )
-
-                } catch (e: Exception) {
-
-                    snackbar.showSnackbar(
-                        e.message
-                            ?: "Request failed."
-                    )
-
-                } finally {
-
-                    setBusy(false)
-                }
-            }
-        },
-
-        modifier = Modifier.weight(1f)
-    ) {
-
-        Text(label)
-    }
-}
-
-@Composable
 fun ConsoleScreen(
-    title: String,
     client: ApiClient,
     minecraft: Boolean,
     snackbar: SnackbarHostState
@@ -923,7 +1020,7 @@ fun ConsoleScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .fillMaxHeight(0.78f)
         ) {
 
             LazyColumn(
@@ -956,13 +1053,17 @@ fun ConsoleScreen(
 
                 OutlinedTextField(
                     value = command,
+
                     onValueChange = {
                         command = it
                     },
-                    modifier = Modifier.weight(1f),
+
+                    modifier = Modifier.fillMaxWidth(0.68f),
+
                     label = {
                         Text("Command")
                     },
+
                     singleLine = true
                 )
 
@@ -1019,7 +1120,6 @@ fun ConsoleScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     client: ApiClient,
@@ -1213,146 +1313,120 @@ fun SettingsScreen(
         }
 
         item {
-
             ConfigField(
-                label = "Calagopus URL",
-                value = calagopusUrl,
-                onValueChange = {
-                    calagopusUrl = it
-                }
-            )
+                "Calagopus URL",
+                calagopusUrl
+            ) {
+                calagopusUrl = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Server UUID",
-                value = serverUuid,
-                onValueChange = {
-                    serverUuid = it
-                }
-            )
+                "Server UUID",
+                serverUuid
+            ) {
+                serverUuid = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "API Key Environment",
-                value = apiKeyEnv,
-                onValueChange = {
-                    apiKeyEnv = it
-                }
-            )
+                "API Key Environment",
+                apiKeyEnv
+            ) {
+                apiKeyEnv = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Backend Server",
-                value = backendServer,
-                onValueChange = {
-                    backendServer = it
-                }
-            )
+                "Backend Server",
+                backendServer
+            ) {
+                backendServer = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Status Host",
-                value = statusHost,
-                onValueChange = {
-                    statusHost = it
-                }
-            )
+                "Status Host",
+                statusHost
+            ) {
+                statusHost = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Status Port",
-                value = statusPort,
-                onValueChange = {
-                    statusPort = it
-                }
-            )
+                "Status Port",
+                statusPort
+            ) {
+                statusPort = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Status Timeout Millis",
-                value = statusTimeoutMillis,
-                onValueChange = {
-                    statusTimeoutMillis = it
-                }
-            )
+                "Status Timeout Millis",
+                statusTimeoutMillis
+            ) {
+                statusTimeoutMillis = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Check Interval Seconds",
-                value = checkIntervalSeconds,
-                onValueChange = {
-                    checkIntervalSeconds = it
-                }
-            )
+                "Check Interval Seconds",
+                checkIntervalSeconds
+            ) {
+                checkIntervalSeconds = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Startup Timeout Seconds",
-                value = startupTimeoutSeconds,
-                onValueChange = {
-                    startupTimeoutSeconds = it
-                }
-            )
+                "Startup Timeout Seconds",
+                startupTimeoutSeconds
+            ) {
+                startupTimeoutSeconds = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Startup Poll Seconds",
-                value = startupPollSeconds,
-                onValueChange = {
-                    startupPollSeconds = it
-                }
-            )
+                "Startup Poll Seconds",
+                startupPollSeconds
+            ) {
+                startupPollSeconds = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Idle Minutes",
-                value = idleMinutes,
-                onValueChange = {
-                    idleMinutes = it
-                }
-            )
+                "Idle Minutes",
+                idleMinutes
+            ) {
+                idleMinutes = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Save Wait Seconds",
-                value = saveWaitSeconds,
-                onValueChange = {
-                    saveWaitSeconds = it
-                }
-            )
+                "Save Wait Seconds",
+                saveWaitSeconds
+            ) {
+                saveWaitSeconds = it
+            }
         }
 
         item {
-
             ConfigField(
-                label = "Save Before Stop",
-                value = saveBeforeStop,
-                onValueChange = {
-                    saveBeforeStop = it
-                }
-            )
+                "Save Before Stop",
+                saveBeforeStop
+            ) {
+                saveBeforeStop = it
+            }
         }
 
         item {
@@ -1380,24 +1454,53 @@ fun SettingsScreen(
 
                             val values =
                                 mapOf(
-                                    "calagopusUrl" to calagopusUrl,
-                                    "serverUuid" to serverUuid,
-                                    "apiKeyEnv" to apiKeyEnv,
-                                    "backendServer" to backendServer,
-                                    "statusHost" to statusHost,
-                                    "statusPort" to statusPort,
-                                    "statusTimeoutMillis" to statusTimeoutMillis,
-                                    "checkIntervalSeconds" to checkIntervalSeconds,
-                                    "startupTimeoutSeconds" to startupTimeoutSeconds,
-                                    "startupPollSeconds" to startupPollSeconds,
-                                    "idleMinutes" to idleMinutes,
-                                    "saveWaitSeconds" to saveWaitSeconds,
-                                    "saveBeforeStop" to saveBeforeStop,
-                                    "startupMessage" to startupMessage
+
+                                    "calagopusUrl"
+                                        to calagopusUrl,
+
+                                    "serverUuid"
+                                        to serverUuid,
+
+                                    "apiKeyEnv"
+                                        to apiKeyEnv,
+
+                                    "backendServer"
+                                        to backendServer,
+
+                                    "statusHost"
+                                        to statusHost,
+
+                                    "statusPort"
+                                        to statusPort,
+
+                                    "statusTimeoutMillis"
+                                        to statusTimeoutMillis,
+
+                                    "checkIntervalSeconds"
+                                        to checkIntervalSeconds,
+
+                                    "startupTimeoutSeconds"
+                                        to startupTimeoutSeconds,
+
+                                    "startupPollSeconds"
+                                        to startupPollSeconds,
+
+                                    "idleMinutes"
+                                        to idleMinutes,
+
+                                    "saveWaitSeconds"
+                                        to saveWaitSeconds,
+
+                                    "saveBeforeStop"
+                                        to saveBeforeStop,
+
+                                    "startupMessage"
+                                        to startupMessage
                                 )
 
                             val result =
                                 withContext(Dispatchers.IO) {
+
                                     client.saveConfig(
                                         values
                                     )
@@ -1482,10 +1585,13 @@ fun ConfigField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+
         modifier = Modifier.fillMaxWidth(),
+
         label = {
             Text(label)
         },
+
         singleLine = singleLine
     )
 }
