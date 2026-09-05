@@ -24,9 +24,8 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
@@ -34,38 +33,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Compile Kotlin and capture ALL output
+      - name: Compile Kotlin
         run: |
-          set +e
+          gradle :app:compileDebugKotlin \
+            --stacktrace \
+            --console=plain \
+            2>&1 | tee build.log
 
-          gradle :app:compileDebugKotlin --stacktrace --debug > kotlin-build.log 2>&1
-
-          RESULT=$?
-
-          echo ""
-          echo "========================================"
-          echo "       COMPLETE KOTLIN BUILD LOG"
-          echo "========================================"
-
-          cat kotlin-build.log
-
-          echo "========================================"
-          echo "       END KOTLIN BUILD LOG"
-          echo "========================================"
-
-          exit $RESULT
-
-      - name: Upload Kotlin build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kotlin-build-log
-          path: kotlin-build.log
-          if-no-files-found: error
-
-      - name: Build Debug APK
+      - name: Show compiler diagnostics
+        if: failure()
         run: |
-          gradle assembleDebug --stacktrace
+          echo "========== COMPILER DIAGNOSTICS =========="
+          cat build.log
+          echo "========== END DIAGNOSTICS =========="
+
+      - name: Build APK
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
