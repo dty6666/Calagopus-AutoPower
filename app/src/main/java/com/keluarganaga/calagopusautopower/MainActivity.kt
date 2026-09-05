@@ -238,7 +238,8 @@ fun LoginScreen(
 
                     } catch (e: Exception) {
 
-                        error = e.message ?: "Unable to connect to the panel."
+                        error = e.message
+                            ?: "Unable to connect to the panel."
 
                     } finally {
 
@@ -273,7 +274,9 @@ fun MainShell(
     onLogout: () -> Unit
 ) {
 
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember {
+        mutableStateOf(0)
+    }
 
     val snackbar = remember {
         SnackbarHostState()
@@ -285,6 +288,7 @@ fun MainShell(
 
             TopAppBar(
                 title = {
+
                     Text(
                         when (selectedTab) {
                             0 -> "Dashboard"
@@ -428,7 +432,8 @@ fun DashboardScreen(
         } catch (e: Exception) {
 
             snackbar.showSnackbar(
-                e.message ?: "Failed to refresh status."
+                e.message
+                    ?: "Failed to refresh status."
             )
 
         } finally {
@@ -532,9 +537,12 @@ fun DashboardScreen(
 
                             try {
 
-                                val result = withContext(Dispatchers.IO) {
-                                    client.action("/api/config/reload")
-                                }
+                                val result =
+                                    withContext(Dispatchers.IO) {
+                                        client.action(
+                                            "/api/config/reload"
+                                        )
+                                    }
 
                                 snackbar.showSnackbar(
                                     result.optString(
@@ -546,7 +554,8 @@ fun DashboardScreen(
                             } catch (e: Exception) {
 
                                 snackbar.showSnackbar(
-                                    e.message ?: "Reload failed."
+                                    e.message
+                                        ?: "Reload failed."
                                 )
                             }
                         }
@@ -599,16 +608,22 @@ fun ServerStatusCard(
             } else {
 
                 val state =
-                    status?.optString("state", "UNKNOWN")
-                        ?: "UNKNOWN"
+                    status?.optString(
+                        "state",
+                        "UNKNOWN"
+                    ) ?: "UNKNOWN"
 
                 val starting =
-                    status?.optBoolean("starting", false)
-                        ?: false
+                    status?.optBoolean(
+                        "starting",
+                        false
+                    ) ?: false
 
                 val stopping =
-                    status?.optBoolean("stopping", false)
-                        ?: false
+                    status?.optBoolean(
+                        "stopping",
+                        false
+                    ) ?: false
 
                 Text(
                     text = state.uppercase(),
@@ -616,12 +631,10 @@ fun ServerStatusCard(
                 )
 
                 if (starting) {
-
                     Text("Starting...")
                 }
 
                 if (stopping) {
-
                     Text("Stopping...")
                 }
             }
@@ -635,20 +648,28 @@ fun PlayerCard(
 ) {
 
     val players =
-        status?.optInt("players", 0)
-            ?: 0
+        status?.optInt(
+            "players",
+            0
+        ) ?: 0
 
     val maxPlayers =
-        status?.optInt("maxPlayers", 0)
-            ?: 0
+        status?.optInt(
+            "maxPlayers",
+            0
+        ) ?: 0
 
     val idleLimit =
-        status?.optInt("idleLimitMinutes", 0)
-            ?: 0
+        status?.optInt(
+            "idleLimitMinutes",
+            0
+        ) ?: 0
 
     val idleSeconds =
-        status?.optLong("idleSeconds", -1)
-            ?: -1
+        status?.optLong(
+            "idleSeconds",
+            -1
+        ) ?: -1
 
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -683,7 +704,9 @@ fun PlayerCard(
             if (idleSeconds >= 0) {
 
                 Text(
-                    text = "Idle time: ${formatSeconds(idleSeconds)}"
+                    text = "Idle time: ${
+                        formatSeconds(idleSeconds)
+                    }"
                 )
 
             } else {
@@ -700,34 +723,50 @@ fun ResourceCard(
 ) {
 
     val data =
-        resources?.optJSONObject("resources")
+        resources?.optJSONObject(
+            "resources"
+        )
 
     val memory =
-        data?.optLong("memory_bytes", 0)
-            ?: 0
+        data?.optLong(
+            "memory_bytes",
+            0
+        ) ?: 0
 
     val memoryLimit =
-        data?.optLong("memory_limit_bytes", 0)
-            ?: 0
+        data?.optLong(
+            "memory_limit_bytes",
+            0
+        ) ?: 0
 
     val cpu =
-        data?.optDouble("cpu_absolute", 0.0)
-            ?: 0.0
+        data?.optDouble(
+            "cpu_absolute",
+            0.0
+        ) ?: 0.0
 
     val disk =
-        data?.optLong("disk_bytes", 0)
-            ?: 0
+        data?.optLong(
+            "disk_bytes",
+            0
+        ) ?: 0
 
     val network =
-        data?.optJSONObject("network")
+        data?.optJSONObject(
+            "network"
+        )
 
     val rx =
-        network?.optLong("rx_bytes", 0)
-            ?: 0
+        network?.optLong(
+            "rx_bytes",
+            0
+        ) ?: 0
 
     val tx =
-        network?.optLong("tx_bytes", 0)
-            ?: 0
+        network?.optLong(
+            "tx_bytes",
+            0
+        ) ?: 0
 
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -747,11 +786,17 @@ fun ResourceCard(
             )
 
             Text(
-                text = "Memory: ${formatBytes(memory)} / ${formatBytes(memoryLimit)}"
+                text = "Memory: ${
+                    formatBytes(memory)
+                } / ${
+                    formatBytes(memoryLimit)
+                }"
             )
 
             Text(
-                text = "CPU: ${String.format("%.1f", cpu)}%"
+                text = "CPU: ${
+                    String.format("%.1f", cpu)
+                }%"
             )
 
             Text(
@@ -789,9 +834,10 @@ fun RowScope.ActionButton(
 
                 try {
 
-                    val result = withContext(Dispatchers.IO) {
-                        client.action(path)
-                    }
+                    val result =
+                        withContext(Dispatchers.IO) {
+                            client.action(path)
+                        }
 
                     snackbar.showSnackbar(
                         result.optString(
@@ -803,7 +849,8 @@ fun RowScope.ActionButton(
                 } catch (e: Exception) {
 
                     snackbar.showSnackbar(
-                        e.message ?: "Request failed."
+                        e.message
+                            ?: "Request failed."
                     )
 
                 } finally {
@@ -859,7 +906,8 @@ fun ConsoleScreen(
 
             } catch (e: Exception) {
 
-                logs = "Error loading logs:\n${e.message}"
+                logs =
+                    "Error loading logs:\n${e.message}"
             }
 
             delay(3000)
@@ -933,7 +981,9 @@ fun ConsoleScreen(
 
                                 val result =
                                     withContext(Dispatchers.IO) {
-                                        client.command(command)
+                                        client.command(
+                                            command
+                                        )
                                     }
 
                                 snackbar.showSnackbar(
@@ -948,7 +998,8 @@ fun ConsoleScreen(
                             } catch (e: Exception) {
 
                                 snackbar.showSnackbar(
-                                    e.message ?: "Command failed."
+                                    e.message
+                                        ?: "Command failed."
                                 )
 
                             } finally {
@@ -1051,53 +1102,96 @@ fun SettingsScreen(
             }
 
             calagopusUrl =
-                config.optString("calagopusUrl", "")
+                config.optString(
+                    "calagopusUrl",
+                    ""
+                )
 
             serverUuid =
-                config.optString("serverUuid", "")
+                config.optString(
+                    "serverUuid",
+                    ""
+                )
 
             apiKeyEnv =
-                config.optString("apiKeyEnv", "")
+                config.optString(
+                    "apiKeyEnv",
+                    ""
+                )
 
             backendServer =
-                config.optString("backendServer", "")
+                config.optString(
+                    "backendServer",
+                    ""
+                )
 
             statusHost =
-                config.optString("statusHost", "")
+                config.optString(
+                    "statusHost",
+                    ""
+                )
 
             statusPort =
-                config.optString("statusPort", "")
+                config.optString(
+                    "statusPort",
+                    ""
+                )
 
             statusTimeoutMillis =
-                config.optString("statusTimeoutMillis", "")
+                config.optString(
+                    "statusTimeoutMillis",
+                    ""
+                )
 
             checkIntervalSeconds =
-                config.optString("checkIntervalSeconds", "")
+                config.optString(
+                    "checkIntervalSeconds",
+                    ""
+                )
 
             startupTimeoutSeconds =
-                config.optString("startupTimeoutSeconds", "")
+                config.optString(
+                    "startupTimeoutSeconds",
+                    ""
+                )
 
             startupPollSeconds =
-                config.optString("startupPollSeconds", "")
+                config.optString(
+                    "startupPollSeconds",
+                    ""
+                )
 
             idleMinutes =
-                config.optString("idleMinutes", "")
+                config.optString(
+                    "idleMinutes",
+                    ""
+                )
 
             saveWaitSeconds =
-                config.optString("saveWaitSeconds", "")
+                config.optString(
+                    "saveWaitSeconds",
+                    ""
+                )
 
             saveBeforeStop =
-                config.optString("saveBeforeStop", "")
+                config.optString(
+                    "saveBeforeStop",
+                    ""
+                )
 
             startupMessage =
-                config.optString("startupMessage", "")
+                config.optString(
+                    "startupMessage",
+                    ""
+                )
 
             loaded = true
 
         } catch (e: Exception) {
 
             snackbar.showSnackbar(
-                e.message ?: "Failed to load configuration."
+                e.message
+                    ?: "Failed to load configuration."
             )
         }
     }
@@ -1304,7 +1398,9 @@ fun SettingsScreen(
 
                             val result =
                                 withContext(Dispatchers.IO) {
-                                    client.saveConfig(values)
+                                    client.saveConfig(
+                                        values
+                                    )
                                 }
 
                             snackbar.showSnackbar(
@@ -1349,7 +1445,9 @@ fun SettingsScreen(
         item {
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(
+                    vertical = 8.dp
+                )
             )
         }
 
@@ -1409,7 +1507,10 @@ fun formatBytes(bytes: Long): String {
     var value = bytes.toDouble()
     var index = 0
 
-    while (value >= 1024 && index < units.size - 1) {
+    while (
+        value >= 1024 &&
+        index < units.size - 1
+    ) {
 
         value /= 1024
         index++
