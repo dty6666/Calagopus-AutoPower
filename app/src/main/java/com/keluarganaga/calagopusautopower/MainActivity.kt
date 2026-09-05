@@ -1,4 +1,3 @@
-```kotlin
 package com.keluarganaga.calagopusautopower
 
 import android.os.Bundle
@@ -14,12 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -28,7 +29,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,8 +37,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -47,14 +47,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            CalagopusApp()
+            MaterialTheme {
+                CalagopusApp()
+            }
         }
     }
 }
@@ -68,45 +69,44 @@ fun CalagopusApp() {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    var client by remember { mutableStateOf<ApiClient?>(null) }
+    var client by remember {
+        mutableStateOf<ApiClient?>(null)
+    }
 
-    MaterialTheme {
+    if (!loggedIn || client == null) {
 
-        if (!loggedIn) {
+        LoginScreen(
+            baseUrl = baseUrl,
+            username = username,
+            password = password,
 
-            LoginScreen(
-                baseUrl = baseUrl,
-                username = username,
-                password = password,
+            onBaseUrlChange = {
+                baseUrl = it
+            },
 
-                onBaseUrl = {
-                    baseUrl = it
-                },
+            onUsernameChange = {
+                username = it
+            },
 
-                onUsername = {
-                    username = it
-                },
+            onPasswordChange = {
+                password = it
+            },
 
-                onPassword = {
-                    password = it
-                },
+            onLoginSuccess = {
+                client = it
+                loggedIn = true
+            }
+        )
 
-                onLoginSuccess = { newClient ->
-                    client = newClient
-                    loggedIn = true
-                }
-            )
+    } else {
 
-        } else {
-
-            MainShell(
-                client = client!!,
-                onLogout = {
-                    loggedIn = false
-                    client = null
-                }
-            )
-        }
+        MainShell(
+            client = client!!,
+            onLogout = {
+                loggedIn = false
+                client = null
+            }
+        )
     }
 }
 
@@ -115,23 +115,23 @@ fun LoginScreen(
     baseUrl: String,
     username: String,
     password: String,
-    onBaseUrl: (String) -> Unit,
-    onUsername: (String) -> Unit,
-    onPassword: (String) -> Unit,
+    onBaseUrlChange: (String) -> Unit,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
     onLoginSuccess: (ApiClient) -> Unit
 ) {
-
-    val scope = rememberCoroutineScope()
 
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
 
+    val scope = rememberCoroutineScope()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         Text(
@@ -139,62 +139,83 @@ fun LoginScreen(
             style = MaterialTheme.typography.headlineMedium
         )
 
+        Spacer(modifier = Modifier.height(8.dp))
+
         Text(
-            text = "Native server control",
-            style = MaterialTheme.typography.bodyLarge
+            text = "Server Control Panel",
+            style = MaterialTheme.typography.bodyMedium
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = baseUrl,
-            onValueChange = onBaseUrl,
+            onValueChange = onBaseUrlChange,
+            modifier = Modifier.fillMaxWidth(),
             label = {
                 Text("Panel URL")
             },
             placeholder = {
-                Text("https://your-panel.example.com")
+                Text("https://example.com")
             },
-            modifier = Modifier.fillMaxWidth()
+            singleLine = true
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
             value = username,
-            onValueChange = onUsername,
+            onValueChange = onUsernameChange,
+            modifier = Modifier.fillMaxWidth(),
             label = {
                 Text("Username")
             },
-            modifier = Modifier.fillMaxWidth()
+            singleLine = true
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
             value = password,
-            onValueChange = onPassword,
+            onValueChange = onPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
             label = {
                 Text("Password")
             },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            singleLine = true
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        if (error.isNotBlank()) {
+        if (error.isNotEmpty()) {
 
             Text(
                 text = error,
-                color = MaterialTheme.colorScheme.error
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         Button(
             onClick = {
+
+                if (baseUrl.isBlank()) {
+                    error = "Enter the panel URL."
+                    return@Button
+                }
+
+                if (username.isBlank()) {
+                    error = "Enter the username."
+                    return@Button
+                }
+
+                if (password.isBlank()) {
+                    error = "Enter the password."
+                    return@Button
+                }
 
                 loading = true
                 error = ""
@@ -203,15 +224,11 @@ fun LoginScreen(
 
                     try {
 
-                        val cleanUrl =
-                            baseUrl.trim().trimEnd('/')
-
-                        val newClient =
-                            ApiClient(
-                                cleanUrl,
-                                username,
-                                password
-                            )
+                        val newClient = ApiClient(
+                            baseUrl.trimEnd('/'),
+                            username,
+                            password
+                        )
 
                         withContext(Dispatchers.IO) {
                             newClient.status()
@@ -221,9 +238,7 @@ fun LoginScreen(
 
                     } catch (e: Exception) {
 
-                        error =
-                            e.message
-                                ?: "Login failed. Check URL, username and password."
+                        error = e.message ?: "Unable to connect to the panel."
 
                     } finally {
 
@@ -232,18 +247,16 @@ fun LoginScreen(
                 }
             },
 
-            enabled =
-                !loading &&
-                baseUrl.isNotBlank() &&
-                username.isNotBlank() &&
-                password.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
 
-            modifier = Modifier.fillMaxWidth()
+            enabled = !loading
         ) {
 
             if (loading) {
 
-                CircularProgressIndicator()
+                CircularProgressIndicator(
+                    modifier = Modifier.height(20.dp)
+                )
 
             } else {
 
@@ -260,38 +273,26 @@ fun MainShell(
     onLogout: () -> Unit
 ) {
 
-    var tab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableStateOf(0) }
 
-    val snackbar =
-        remember {
-            SnackbarHostState()
-        }
-
-    val tabs =
-        listOf(
-            "Dashboard",
-            "Minecraft",
-            "Velocity",
-            "Settings"
-        )
+    val snackbar = remember {
+        SnackbarHostState()
+    }
 
     Scaffold(
 
         topBar = {
 
             TopAppBar(
-
                 title = {
-                    Text(tabs[tab])
-                },
-
-                actions = {
-
-                    TextButton(
-                        onClick = onLogout
-                    ) {
-                        Text("Logout")
-                    }
+                    Text(
+                        when (selectedTab) {
+                            0 -> "Dashboard"
+                            1 -> "Minecraft Console"
+                            2 -> "Velocity Console"
+                            else -> "Settings"
+                        }
+                    )
                 }
             )
         },
@@ -300,29 +301,49 @@ fun MainShell(
 
             NavigationBar {
 
-                tabs.forEachIndexed { index, title ->
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = {
+                        selectedTab = 0
+                    },
+                    icon = {},
+                    label = {
+                        Text("Dashboard")
+                    }
+                )
 
-                    NavigationBarItem(
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = {
+                        selectedTab = 1
+                    },
+                    icon = {},
+                    label = {
+                        Text("Minecraft")
+                    }
+                )
 
-                        selected =
-                            tab == index,
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = {
+                        selectedTab = 2
+                    },
+                    icon = {},
+                    label = {
+                        Text("Velocity")
+                    }
+                )
 
-                        onClick = {
-                            tab = index
-                        },
-
-                        icon = {
-                            Text(
-                                title.first()
-                                    .toString()
-                            )
-                        },
-
-                        label = {
-                            Text(title)
-                        }
-                    )
-                }
+                NavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = {
+                        selectedTab = 3
+                    },
+                    icon = {},
+                    label = {
+                        Text("Settings")
+                    }
+                )
             }
         },
 
@@ -334,32 +355,35 @@ fun MainShell(
 
         Box(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
+                .padding(padding)
         ) {
 
-            when (tab) {
+            when (selectedTab) {
 
                 0 -> DashboardScreen(
-                    client,
-                    snackbar
+                    client = client,
+                    snackbar = snackbar
                 )
 
                 1 -> ConsoleScreen(
-                    client,
-                    false,
-                    snackbar
+                    title = "Minecraft Console",
+                    client = client,
+                    minecraft = true,
+                    snackbar = snackbar
                 )
 
                 2 -> ConsoleScreen(
-                    client,
-                    true,
-                    snackbar
+                    title = "Velocity Console",
+                    client = client,
+                    minecraft = false,
+                    snackbar = snackbar
                 )
 
                 3 -> SettingsScreen(
-                    client,
-                    snackbar
+                    client = client,
+                    snackbar = snackbar,
+                    onLogout = onLogout
                 )
             }
         }
@@ -380,105 +404,367 @@ fun DashboardScreen(
         mutableStateOf<JSONObject?>(null)
     }
 
-    var busy by remember {
-        mutableStateOf(false)
+    var loading by remember {
+        mutableStateOf(true)
+    }
+
+    val scope = rememberCoroutineScope()
+
+    suspend fun refresh() {
+
+        try {
+
+            val newStatus = withContext(Dispatchers.IO) {
+                client.status()
+            }
+
+            val newResources = withContext(Dispatchers.IO) {
+                client.resources()
+            }
+
+            status = newStatus
+            resources = newResources
+
+        } catch (e: Exception) {
+
+            snackbar.showSnackbar(
+                e.message ?: "Failed to refresh status."
+            )
+
+        } finally {
+
+            loading = false
+        }
     }
 
     LaunchedEffect(Unit) {
 
         while (true) {
 
-            try {
-
-                val result =
-                    withContext(Dispatchers.IO) {
-
-                        val newStatus =
-                            client.status()
-
-                        val newResources =
-                            client.resources()
-
-                        Pair(
-                            newStatus,
-                            newResources
-                        )
-                    }
-
-                status = result.first
-                resources = result.second
-
-            } catch (e: Exception) {
-
-                snackbar.showSnackbar(
-                    e.message
-                        ?: "Connection failed"
-                )
-            }
+            refresh()
 
             delay(5000)
         }
     }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(
-                rememberScrollState()
-            )
-            .padding(16.dp)
+            .padding(16.dp),
+
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        StatusCard(status)
+        item {
 
-        Spacer(Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement =
-                Arrangement.spacedBy(8.dp)
-        ) {
-
-            ActionButton(
-                label = "Start",
-                path = "/api/start",
-                client = client,
-                snackbar = snackbar,
-                setBusy = {
-                    busy = it
-                }
-            )
-
-            ActionButton(
-                label = "Save",
-                path = "/api/save",
-                client = client,
-                snackbar = snackbar,
-                setBusy = {
-                    busy = it
-                }
-            )
-
-            ActionButton(
-                label = "Stop",
-                path = "/api/stop",
-                client = client,
-                snackbar = snackbar,
-                setBusy = {
-                    busy = it
-                }
+            ServerStatusCard(
+                status = status,
+                loading = loading
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        item {
 
-        ResourceCard(resources)
+            PlayerCard(
+                status = status
+            )
+        }
 
-        Spacer(Modifier.height(12.dp))
+        item {
 
-        if (busy) {
+            ResourceCard(
+                resources = resources
+            )
+        }
 
-            CircularProgressIndicator()
+        item {
+
+            Text(
+                text = "Server Controls",
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+
+        item {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+
+                ActionButton(
+                    label = "Start",
+                    path = "/api/start",
+                    client = client,
+                    snackbar = snackbar,
+                    setBusy = {}
+                )
+
+                ActionButton(
+                    label = "Stop",
+                    path = "/api/stop",
+                    client = client,
+                    snackbar = snackbar,
+                    setBusy = {}
+                )
+            }
+        }
+
+        item {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+
+                ActionButton(
+                    label = "Save",
+                    path = "/api/save",
+                    client = client,
+                    snackbar = snackbar,
+                    setBusy = {}
+                )
+
+                Button(
+                    onClick = {
+
+                        scope.launch {
+
+                            try {
+
+                                val result = withContext(Dispatchers.IO) {
+                                    client.action("/api/config/reload")
+                                }
+
+                                snackbar.showSnackbar(
+                                    result.optString(
+                                        "message",
+                                        "Configuration reloaded."
+                                    )
+                                )
+
+                            } catch (e: Exception) {
+
+                                snackbar.showSnackbar(
+                                    e.message ?: "Reload failed."
+                                )
+                            }
+                        }
+                    },
+
+                    modifier = Modifier.weight(1f)
+                ) {
+
+                    Text("Reload")
+                }
+            }
+        }
+
+        item {
+
+            Spacer(
+                modifier = Modifier.height(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun ServerStatusCard(
+    status: JSONObject?,
+    loading: Boolean
+) {
+
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+
+            Text(
+                text = "Paper Server",
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            if (loading && status == null) {
+
+                CircularProgressIndicator()
+
+            } else {
+
+                val state =
+                    status?.optString("state", "UNKNOWN")
+                        ?: "UNKNOWN"
+
+                val starting =
+                    status?.optBoolean("starting", false)
+                        ?: false
+
+                val stopping =
+                    status?.optBoolean("stopping", false)
+                        ?: false
+
+                Text(
+                    text = state.uppercase(),
+                    style = MaterialTheme.typography.headlineSmall
+                )
+
+                if (starting) {
+
+                    Text("Starting...")
+                }
+
+                if (stopping) {
+
+                    Text("Stopping...")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlayerCard(
+    status: JSONObject?
+) {
+
+    val players =
+        status?.optInt("players", 0)
+            ?: 0
+
+    val maxPlayers =
+        status?.optInt("maxPlayers", 0)
+            ?: 0
+
+    val idleLimit =
+        status?.optInt("idleLimitMinutes", 0)
+            ?: 0
+
+    val idleSeconds =
+        status?.optLong("idleSeconds", -1)
+            ?: -1
+
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+
+            Text(
+                text = "Players",
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            Text(
+                text = "$players / $maxPlayers",
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            Text(
+                text = "Idle limit: ${idleLimit} min"
+            )
+
+            if (idleSeconds >= 0) {
+
+                Text(
+                    text = "Idle time: ${formatSeconds(idleSeconds)}"
+                )
+
+            } else {
+
+                Text("Idle time: Not idle")
+            }
+        }
+    }
+}
+
+@Composable
+fun ResourceCard(
+    resources: JSONObject?
+) {
+
+    val data =
+        resources?.optJSONObject("resources")
+
+    val memory =
+        data?.optLong("memory_bytes", 0)
+            ?: 0
+
+    val memoryLimit =
+        data?.optLong("memory_limit_bytes", 0)
+            ?: 0
+
+    val cpu =
+        data?.optDouble("cpu_absolute", 0.0)
+            ?: 0.0
+
+    val disk =
+        data?.optLong("disk_bytes", 0)
+            ?: 0
+
+    val network =
+        data?.optJSONObject("network")
+
+    val rx =
+        network?.optLong("rx_bytes", 0)
+            ?: 0
+
+    val tx =
+        network?.optLong("tx_bytes", 0)
+            ?: 0
+
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+
+            Text(
+                text = "Resources",
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            Text(
+                text = "Memory: ${formatBytes(memory)} / ${formatBytes(memoryLimit)}"
+            )
+
+            Text(
+                text = "CPU: ${String.format("%.1f", cpu)}%"
+            )
+
+            Text(
+                text = "Disk: ${formatBytes(disk)}"
+            )
+
+            Text(
+                text = "Network RX: ${formatBytes(rx)}"
+            )
+
+            Text(
+                text = "Network TX: ${formatBytes(tx)}"
+            )
         }
     }
 }
@@ -492,11 +778,9 @@ fun RowScope.ActionButton(
     setBusy: (Boolean) -> Unit
 ) {
 
-    val scope =
-        rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     Button(
-
         onClick = {
 
             setBusy(true)
@@ -505,10 +789,9 @@ fun RowScope.ActionButton(
 
                 try {
 
-                    val result =
-                        withContext(Dispatchers.IO) {
-                            client.action(path)
-                        }
+                    val result = withContext(Dispatchers.IO) {
+                        client.action(path)
+                    }
 
                     snackbar.showSnackbar(
                         result.optString(
@@ -520,8 +803,7 @@ fun RowScope.ActionButton(
                 } catch (e: Exception) {
 
                     snackbar.showSnackbar(
-                        e.message
-                            ?: "Request failed"
+                        e.message ?: "Request failed."
                     )
 
                 } finally {
@@ -539,215 +821,45 @@ fun RowScope.ActionButton(
 }
 
 @Composable
-fun StatusCard(
-    status: JSONObject?
-) {
-
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-
-            Text(
-                "Paper Server",
-                style =
-                    MaterialTheme.typography.titleLarge
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "Status: ${
-                    status?.optString(
-                        "state",
-                        "Loading..."
-                    ) ?: "Loading..."
-                }"
-            )
-
-            Text(
-                "Players: ${
-                    status?.optInt(
-                        "players",
-                        0
-                    ) ?: 0
-                } / ${
-                    status?.optInt(
-                        "maxPlayers",
-                        0
-                    ) ?: 0
-                }"
-            )
-
-            Text(
-                "Idle limit: ${
-                    status?.optInt(
-                        "idleLimitMinutes",
-                        0
-                    ) ?: 0
-                } min"
-            )
-
-            Text(
-                "Idle time: ${
-                    formatSeconds(
-                        status?.optLong(
-                            "idleSeconds",
-                            0
-                        ) ?: 0
-                    )
-                }"
-            )
-
-            Text(
-                "Uptime: ${
-                    formatSeconds(
-                        status?.optLong(
-                            "serverUptimeSeconds",
-                            0
-                        ) ?: 0
-                    )
-                }"
-            )
-        }
-    }
-}
-
-@Composable
-fun ResourceCard(
-    resources: JSONObject?
-) {
-
-    val network =
-        resources?.optJSONObject("network")
-
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-
-            Text(
-                "Resources",
-                style =
-                    MaterialTheme.typography.titleLarge
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "Memory: ${
-                    bytes(
-                        resources?.optLong(
-                            "memory_bytes",
-                            0
-                        ) ?: 0
-                    )
-                } / ${
-                    bytes(
-                        resources?.optLong(
-                            "memory_limit_bytes",
-                            0
-                        ) ?: 0
-                    )
-                }"
-            )
-
-            Text(
-                "CPU: ${
-                    "%.1f".format(
-                        resources?.optDouble(
-                            "cpu_absolute",
-                            0.0
-                        ) ?: 0.0
-                    )
-                }%"
-            )
-
-            Text(
-                "Disk: ${
-                    bytes(
-                        resources?.optLong(
-                            "disk_bytes",
-                            0
-                        ) ?: 0
-                    )
-                }"
-            )
-
-            Text(
-                "Network RX: ${
-                    bytes(
-                        network?.optLong(
-                            "rx_bytes",
-                            0
-                        ) ?: 0
-                    )
-                }"
-            )
-
-            Text(
-                "Network TX: ${
-                    bytes(
-                        network?.optLong(
-                            "tx_bytes",
-                            0
-                        ) ?: 0
-                    )
-                }"
-            )
-        }
-    }
-}
-
-@Composable
 fun ConsoleScreen(
+    title: String,
     client: ApiClient,
-    velocity: Boolean,
+    minecraft: Boolean,
     snackbar: SnackbarHostState
 ) {
 
-    val scope =
-        rememberCoroutineScope()
-
     var logs by remember {
-
-        mutableStateOf(
-            if (velocity)
-                "Loading Velocity logs..."
-            else
-                "Loading Minecraft logs..."
-        )
+        mutableStateOf("")
     }
 
     var command by remember {
         mutableStateOf("")
     }
 
-    LaunchedEffect(velocity) {
+    var sending by remember {
+        mutableStateOf(false)
+    }
+
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(minecraft) {
 
         while (true) {
 
             try {
 
-                logs =
-                    withContext(Dispatchers.IO) {
+                logs = withContext(Dispatchers.IO) {
 
-                        if (velocity)
-                            client.velocityLogs()
-                        else
-                            client.minecraftLogs()
+                    if (minecraft) {
+                        client.minecraftLogs()
+                    } else {
+                        client.velocityLogs()
                     }
+                }
 
             } catch (e: Exception) {
 
-                logs =
-                    "Error: ${e.message}"
+                logs = "Error loading logs:\n${e.message}"
             }
 
             delay(3000)
@@ -766,92 +878,87 @@ fun ConsoleScreen(
                 .weight(1f)
         ) {
 
-            Text(
-                text = logs,
-                fontFamily =
-                    FontFamily.Monospace,
-
+            LazyColumn(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .verticalScroll(
-                        rememberScrollState()
+                    .fillMaxSize()
+                    .padding(12.dp)
+            ) {
+
+                item {
+
+                    Text(
+                        text = logs,
+                        style = MaterialTheme.typography.bodySmall
                     )
-            )
+                }
+            }
         }
 
-        if (!velocity) {
+        Spacer(
+            modifier = Modifier.height(8.dp)
+        )
 
-            Spacer(Modifier.height(8.dp))
+        if (minecraft) {
 
             Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
 
                 OutlinedTextField(
-
                     value = command,
-
                     onValueChange = {
                         command = it
                     },
-
+                    modifier = Modifier.weight(1f),
                     label = {
-                        Text("Minecraft command")
+                        Text("Command")
                     },
-
-                    placeholder = {
-                        Text("say Hello")
-                    },
-
-                    modifier =
-                        Modifier.weight(1f)
+                    singleLine = true
                 )
 
                 Button(
-
                     onClick = {
 
                         if (command.isBlank()) {
                             return@Button
                         }
 
-                        val commandToSend =
-                            command
-
-                        command = ""
+                        sending = true
 
                         scope.launch {
 
                             try {
 
                                 val result =
-                                    withContext(
-                                        Dispatchers.IO
-                                    ) {
-                                        client.command(
-                                            commandToSend
-                                        )
+                                    withContext(Dispatchers.IO) {
+                                        client.command(command)
                                     }
 
                                 snackbar.showSnackbar(
                                     result.optString(
                                         "message",
-                                        "Command sent"
+                                        "Command sent."
                                     )
                                 )
+
+                                command = ""
 
                             } catch (e: Exception) {
 
                                 snackbar.showSnackbar(
-                                    e.message
-                                        ?: "Command failed"
+                                    e.message ?: "Command failed."
                                 )
+
+                            } finally {
+
+                                sending = false
                             }
                         }
-                    }
+                    },
+
+                    enabled = !sending
                 ) {
 
                     Text("Send")
@@ -861,299 +968,475 @@ fun ConsoleScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     client: ApiClient,
-    snackbar: SnackbarHostState
+    snackbar: SnackbarHostState,
+    onLogout: () -> Unit
 ) {
 
-    val scope =
-        rememberCoroutineScope()
-
-    var config by remember {
-        mutableStateOf<JSONObject?>(null)
+    var loaded by remember {
+        mutableStateOf(false)
     }
 
-    var idle by remember {
+    var calagopusUrl by remember {
         mutableStateOf("")
     }
 
-    var timeout by remember {
+    var serverUuid by remember {
         mutableStateOf("")
     }
+
+    var apiKeyEnv by remember {
+        mutableStateOf("")
+    }
+
+    var backendServer by remember {
+        mutableStateOf("")
+    }
+
+    var statusHost by remember {
+        mutableStateOf("")
+    }
+
+    var statusPort by remember {
+        mutableStateOf("")
+    }
+
+    var statusTimeoutMillis by remember {
+        mutableStateOf("")
+    }
+
+    var checkIntervalSeconds by remember {
+        mutableStateOf("")
+    }
+
+    var startupTimeoutSeconds by remember {
+        mutableStateOf("")
+    }
+
+    var startupPollSeconds by remember {
+        mutableStateOf("")
+    }
+
+    var idleMinutes by remember {
+        mutableStateOf("")
+    }
+
+    var saveWaitSeconds by remember {
+        mutableStateOf("")
+    }
+
+    var saveBeforeStop by remember {
+        mutableStateOf("")
+    }
+
+    var startupMessage by remember {
+        mutableStateOf("")
+    }
+
+    var saving by remember {
+        mutableStateOf(false)
+    }
+
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
 
         try {
 
-            val newConfig =
-                withContext(Dispatchers.IO) {
-                    client.config()
-                }
+            val config = withContext(Dispatchers.IO) {
+                client.config()
+            }
 
-            config = newConfig
+            calagopusUrl =
+                config.optString("calagopusUrl", "")
 
-            idle =
-                newConfig.optString(
-                    "idleMinutes"
-                )
+            serverUuid =
+                config.optString("serverUuid", "")
 
-            timeout =
-                newConfig.optString(
-                    "startupTimeoutSeconds"
-                )
+            apiKeyEnv =
+                config.optString("apiKeyEnv", "")
+
+            backendServer =
+                config.optString("backendServer", "")
+
+            statusHost =
+                config.optString("statusHost", "")
+
+            statusPort =
+                config.optString("statusPort", "")
+
+            statusTimeoutMillis =
+                config.optString("statusTimeoutMillis", "")
+
+            checkIntervalSeconds =
+                config.optString("checkIntervalSeconds", "")
+
+            startupTimeoutSeconds =
+                config.optString("startupTimeoutSeconds", "")
+
+            startupPollSeconds =
+                config.optString("startupPollSeconds", "")
+
+            idleMinutes =
+                config.optString("idleMinutes", "")
+
+            saveWaitSeconds =
+                config.optString("saveWaitSeconds", "")
+
+            saveBeforeStop =
+                config.optString("saveBeforeStop", "")
+
+            startupMessage =
+                config.optString("startupMessage", "")
+
+            loaded = true
 
         } catch (e: Exception) {
 
             snackbar.showSnackbar(
-                e.message
-                    ?: "Unable to load settings"
+                e.message ?: "Failed to load configuration."
             )
         }
     }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(
-                rememberScrollState()
-            )
-            .padding(16.dp)
+            .padding(16.dp),
+
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
 
-        Text(
-            "Server configuration",
-            style =
-                MaterialTheme.typography.headlineSmall
-        )
+        item {
 
-        Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Configuration",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        }
 
-        SettingReadOnly(
-            "Calagopus URL",
-            config?.optString(
-                "calagopusUrl",
-                ""
-            ) ?: ""
-        )
+        item {
 
-        SettingReadOnly(
-            "Backend server",
-            config?.optString(
-                "backendServer",
-                ""
-            ) ?: ""
-        )
-
-        SettingReadOnly(
-            "Server UUID",
-            config?.optString(
-                "serverUuid",
-                ""
-            ) ?: ""
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = idle,
-            onValueChange = {
-                idle = it
-            },
-            label = {
-                Text("Idle minutes")
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = timeout,
-            onValueChange = {
-                timeout = it
-            },
-            label = {
-                Text("Startup timeout seconds")
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        Button(
-
-            onClick = {
-
-                val currentConfig =
-                    config ?: return@Button
-
-                val values =
-                    mutableMapOf<String, String>()
-
-                val keys = listOf(
-                    "calagopusUrl",
-                    "serverUuid",
-                    "apiKeyEnv",
-                    "backendServer",
-                    "statusHost",
-                    "statusPort",
-                    "statusTimeoutMillis",
-                    "checkIntervalSeconds",
-                    "startupTimeoutSeconds",
-                    "startupPollSeconds",
-                    "idleMinutes",
-                    "saveWaitSeconds",
-                    "saveBeforeStop",
-                    "startupMessage"
-                )
-
-                keys.forEach { key ->
-
-                    values[key] =
-                        currentConfig.optString(
-                            key,
-                            ""
-                        )
+            ConfigField(
+                label = "Calagopus URL",
+                value = calagopusUrl,
+                onValueChange = {
+                    calagopusUrl = it
                 }
+            )
+        }
 
-                values["idleMinutes"] =
-                    idle
+        item {
 
-                values["startupTimeoutSeconds"] =
-                    timeout
+            ConfigField(
+                label = "Server UUID",
+                value = serverUuid,
+                onValueChange = {
+                    serverUuid = it
+                }
+            )
+        }
 
-                values["saveBeforeStop"] =
-                    currentConfig.optString(
-                        "saveBeforeStop",
-                        "false"
+        item {
+
+            ConfigField(
+                label = "API Key Environment",
+                value = apiKeyEnv,
+                onValueChange = {
+                    apiKeyEnv = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Backend Server",
+                value = backendServer,
+                onValueChange = {
+                    backendServer = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Status Host",
+                value = statusHost,
+                onValueChange = {
+                    statusHost = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Status Port",
+                value = statusPort,
+                onValueChange = {
+                    statusPort = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Status Timeout Millis",
+                value = statusTimeoutMillis,
+                onValueChange = {
+                    statusTimeoutMillis = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Check Interval Seconds",
+                value = checkIntervalSeconds,
+                onValueChange = {
+                    checkIntervalSeconds = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Startup Timeout Seconds",
+                value = startupTimeoutSeconds,
+                onValueChange = {
+                    startupTimeoutSeconds = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Startup Poll Seconds",
+                value = startupPollSeconds,
+                onValueChange = {
+                    startupPollSeconds = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Idle Minutes",
+                value = idleMinutes,
+                onValueChange = {
+                    idleMinutes = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Save Wait Seconds",
+                value = saveWaitSeconds,
+                onValueChange = {
+                    saveWaitSeconds = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Save Before Stop",
+                value = saveBeforeStop,
+                onValueChange = {
+                    saveBeforeStop = it
+                }
+            )
+        }
+
+        item {
+
+            ConfigField(
+                label = "Startup Message",
+                value = startupMessage,
+                onValueChange = {
+                    startupMessage = it
+                },
+                singleLine = false
+            )
+        }
+
+        item {
+
+            Button(
+                onClick = {
+
+                    saving = true
+
+                    scope.launch {
+
+                        try {
+
+                            val values =
+                                mapOf(
+                                    "calagopusUrl" to calagopusUrl,
+                                    "serverUuid" to serverUuid,
+                                    "apiKeyEnv" to apiKeyEnv,
+                                    "backendServer" to backendServer,
+                                    "statusHost" to statusHost,
+                                    "statusPort" to statusPort,
+                                    "statusTimeoutMillis" to statusTimeoutMillis,
+                                    "checkIntervalSeconds" to checkIntervalSeconds,
+                                    "startupTimeoutSeconds" to startupTimeoutSeconds,
+                                    "startupPollSeconds" to startupPollSeconds,
+                                    "idleMinutes" to idleMinutes,
+                                    "saveWaitSeconds" to saveWaitSeconds,
+                                    "saveBeforeStop" to saveBeforeStop,
+                                    "startupMessage" to startupMessage
+                                )
+
+                            val result =
+                                withContext(Dispatchers.IO) {
+                                    client.saveConfig(values)
+                                }
+
+                            snackbar.showSnackbar(
+                                result.optString(
+                                    "message",
+                                    "Configuration saved."
+                                )
+                            )
+
+                        } catch (e: Exception) {
+
+                            snackbar.showSnackbar(
+                                e.message
+                                    ?: "Failed to save configuration."
+                            )
+
+                        } finally {
+
+                            saving = false
+                        }
+                    }
+                },
+
+                enabled = loaded && !saving,
+
+                modifier = Modifier.fillMaxWidth()
+            ) {
+
+                if (saving) {
+
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(20.dp)
                     )
 
-                scope.launch {
+                } else {
 
-                    try {
-
-                        val result =
-                            withContext(
-                                Dispatchers.IO
-                            ) {
-                                client.saveConfig(
-                                    values
-                                )
-                            }
-
-                        snackbar.showSnackbar(
-                            result.optString(
-                                "message",
-                                "Configuration saved"
-                            )
-                        )
-
-                    } catch (e: Exception) {
-
-                        snackbar.showSnackbar(
-                            e.message
-                                ?: "Save failed"
-                        )
-                    }
+                    Text("Save Configuration")
                 }
-            },
+            }
+        }
 
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        item {
 
-            Text("Save configuration")
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
+        item {
+
+            Button(
+                onClick = onLogout,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+
+                Text("Logout")
+            }
+        }
+
+        item {
+
+            Spacer(
+                modifier = Modifier.height(32.dp)
+            )
         }
     }
 }
 
 @Composable
-fun SettingReadOnly(
+fun ConfigField(
     label: String,
-    value: String
+    value: String,
+    onValueChange: (String) -> Unit,
+    singleLine: Boolean = true
 ) {
 
     OutlinedTextField(
         value = value,
-        onValueChange = {},
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
         label = {
             Text(label)
         },
-        enabled = false,
-        modifier = Modifier.fillMaxWidth()
+        singleLine = singleLine
+    )
+}
+
+fun formatBytes(bytes: Long): String {
+
+    if (bytes <= 0) {
+        return "0 B"
+    }
+
+    val units = arrayOf(
+        "B",
+        "KB",
+        "MB",
+        "GB",
+        "TB"
     )
 
-    Spacer(Modifier.height(8.dp))
-}
+    var value = bytes.toDouble()
+    var index = 0
 
-fun formatSeconds(
-    value: Long
-): String {
+    while (value >= 1024 && index < units.size - 1) {
 
-    val hours = value / 3600
-
-    val minutes =
-        (value % 3600) / 60
-
-    val seconds =
-        value % 60
-
-    return if (hours > 0) {
-
-        "%dh %02dm %02ds".format(
-            hours,
-            minutes,
-            seconds
-        )
-
-    } else {
-
-        "%dm %02ds".format(
-            minutes,
-            seconds
-        )
-    }
-}
-
-fun bytes(
-    value: Long
-): String {
-
-    if (value < 1024) {
-        return "$value B"
-    }
-
-    val units =
-        listOf(
-            "KB",
-            "MB",
-            "GB",
-            "TB"
-        )
-
-    var current =
-        value.toDouble()
-
-    var index = -1
-
-    while (
-        current >= 1024 &&
-        index < units.lastIndex
-    ) {
-
-        current /= 1024
+        value /= 1024
         index++
     }
 
-    return "%.1f %s".format(
-        current,
+    return String.format(
+        "%.1f %s",
+        value,
         units[index]
     )
 }
-```
 
-**Important:** When you paste this into GitHub, make sure the old `MainActivity.kt` is completely replaced—not appended to.
+fun formatSeconds(seconds: Long): String {
 
-Then **Commit changes → Actions → Build APK → Run workflow**.
+    if (seconds < 0) {
+        return "Not idle"
+    }
 
-If the next build error says something about **`compileSdk 37` / Android SDK 37 not found**, we'll change `compileSdk` and `targetSdk` to **35** in `app/build.gradle.kts`, because your workflow currently installs Android API 35.
+    val minutes = seconds / 60
+    val remainingSeconds = seconds % 60
+
+    return if (minutes > 0) {
+
+        "${minutes}m ${remainingSeconds}s"
+
+    } else {
+
+        "${remainingSeconds}s"
+    }
+}
