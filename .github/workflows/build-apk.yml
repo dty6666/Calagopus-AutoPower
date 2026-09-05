@@ -1,69 +1,42 @@
-name: Build APK
+name: Inspect Calagopus ZIP
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
-  build:
-    name: Build Android APK
+  inspect:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Show available Android SDK packages
+      - name: Extract ZIP
         run: |
-          sdkmanager --list | grep -E "platforms;android-37|build-tools;37" || true
+          rm -rf extracted
+          mkdir extracted
+          unzip -q CalagopusAutoPower.zip -d extracted
 
-      - name: Install Android SDK
+      - name: Show project structure
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-37"
-          sdkmanager "build-tools;37.0.0"
+          echo "===== FILES ====="
+          find extracted -type f | sort
 
-      - name: Verify Android SDK
-        run: |
-          echo "Installed SDK packages:"
-          sdkmanager --list_installed | grep -E "platforms;android-37|build-tools;37|platform-tools"
+          echo
+          echo "===== GRADLE FILES ====="
+          find extracted -type f \( \
+            -name "build.gradle" \
+            -o -name "build.gradle.kts" \
+            -o -name "settings.gradle" \
+            -o -name "settings.gradle.kts" \
+            -o -name "gradle.properties" \
+            -o -name "gradlew" \
+          \) -print
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Show environment
-        run: |
-          java -version
-          gradle --version
-
-      - name: Clean
-        run: |
-          gradle clean --console=plain
-
-      - name: Build Debug APK
-        run: |
-          gradle assembleDebug --console=plain --stacktrace
-
-      - name: Verify APK
-        run: |
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          ls -lh app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: calagopus-auto-power-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          echo
+          echo "===== ANDROID FILES ====="
+          find extracted -type f \( \
+            -name "AndroidManifest.xml" \
+            -o -name "*.kt" \
+            -o -name "*.java" \
+          \) | sort
