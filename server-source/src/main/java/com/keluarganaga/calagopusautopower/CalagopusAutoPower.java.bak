@@ -1,0 +1,888 @@
+package com.keluarganaga.calagopusautopower;
+
+import com.google.inject.Inject;
+import com.velocitypowered.api.event.EventHandler;
+import com.velocitypowered.api.event.AwaitingEventExecutor;
+import com.velocitypowered.api.event.EventTask;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.connection.DisconnectEvent;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
+import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import com.velocitypowered.api.scheduler.ScheduledTask;
+import net.kyori.adventure.text.Component;
+import org.slf4j.Logger;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+@Plugin(
+        id = "calagopusautopower",
+        name = "CalagopusAutoPower",
+        version = "1.0.0",
+        description = "Starts a Calagopus-managed backend on join and stops it after an idle period.",
+        authors = {"Keluarganaga"}
+)
+public final class CalagopusAutoPower {
+
+    private final ProxyServer proxy;
+    private final Logger logger;
+    private final Path dataDirectory;
+    private final HttpClient httpClient;
+
+    private Config config;
+    private CalagopusClient api;
+    private RegisteredServer backend;
+    private ScheduledTask monitorTask;
+
+    private final AtomicBoolean starting = new AtomicBoolean(false);
+    private final AtomicBoolean stopping = new AtomicBoolean(false);
+
+    private volatile long zeroPlayersSince = 0L;
+
+    @Inject
+    public CalagopusAutoPower(
+            ProxyServer proxy,
+            Logger logger,
+            @com.velocitypowered.api.plugin.annotation.DataDirectory Path dataDirectory) {
+
+        this.proxy = proxy;
+        this.logger = logger;
+        this.dataDirectory = dataDirectory;
+
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+    }
+
+    @Subscribe
+    public void onProxyInitialize(ProxyInitializeEvent event) {
+        try {
+            this.config = Config.load(dataDirectory, logger);
+
+            this.backend = proxy.getServer(config.backendServer())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Velocity server '" + config.backendServer() + "' was not found"
+                    ));
+
+            String apiKey = System.getenv(config.apiKeyEnv());
+
+            if (apiKey == null || apiKey.isBlank()) {
+                throw new IllegalStateException(
+                        "Environment variable " + config.apiKeyEnv()
+                                + " is missing or empty"
+                );
+            }
+
+            this.api = new CalagopusClient(
+                    httpClient,
+                    config.calagopusUrl(),
+                    config.serverUuid(),
+                    apiKey
+            );
+
+            /*
+             * Register ServerPreConnectEvent using a dedicated
+             * EventHandler implementation.
+             *
+             * This is important for Velocity 4.1 awaited events.
+             */
+	AwaitingEventExecutor<ServerPreConnectEvent> preConnectHandler =
+    	    new AwaitingEventExecutor<>() {
+        @Override
+        public EventTask executeAsync(ServerPreConnectEvent event) {
+            return handleServerPreConnect(event);
+        }
+    };
+
+proxy.getEventManager().register(
+    this,
+    ServerPreConnectEvent.class,
+    preConnectHandler
+);
+
+            logger.info(
+                    "CalagopusAutoPower enabled for backend '{}' (Calagopus server {})",
+                    config.backendServer(),
+                    config.serverUuid()
+            );
+
+            logger.info(
+                    "Idle shutdown: {} minutes; monitor interval: {} seconds",
+                    config.idleMinutes(),
+                    config.checkIntervalSeconds()
+            );
+
+            monitorTask = proxy.getScheduler()
+                    .buildTask(this, this::monitor)
+                    .repeat(
+                            Duration.ofSeconds(
+                                    config.checkIntervalSeconds()
+                            )
+                    )
+                    .schedule();
+
+        } catch (Exception e) {
+            logger.error(
+                    "CalagopusAutoPower failed to initialize: {}",
+                    e.getMessage(),
+                    e
+            );
+        }
+    }
+
+    /**
+     * Handler for Velocity's awaited ServerPreConnectEvent.
+     */
+    private EventTask handleServerPreConnect(
+            ServerPreConnectEvent event) {
+
+        if (backend == null || api == null) {
+            return null;
+        }
+
+        if (stopping.get()) {
+            return null;
+        }
+
+        RegisteredServer requested =
+                event.getOriginalServer();
+
+        if (!requested.getServerInfo()
+                .getName()
+                .equalsIgnoreCase(config.backendServer())) {
+            return null;
+        }
+
+        /*
+         * Check whether Paper is already reachable.
+         */
+        CompletableFuture<Boolean> reachable =
+                backend.ping()
+                        .handle((result, error) -> error == null);
+
+        return EventTask.withContinuation(continuation -> {
+
+            reachable.whenComplete((isReachable, pingError) -> {
+
+                /*
+                 * Paper is already running.
+                 */
+                if (Boolean.TRUE.equals(isReachable)
+                        && pingError == null) {
+
+                    continuation.resume();
+                    return;
+                }
+
+                Player player = event.getPlayer();
+
+                player.sendMessage(
+                        Component.text(
+                                config.startupMessage()
+                        )
+                );
+
+                logger.info(
+                        "{} is trying to connect while Paper is offline. Requesting START...",
+                        player.getUsername()
+                );
+
+                ensureStartedAndReady()
+                        .whenComplete(
+                                (ignored, startError) -> {
+
+                                    if (startError != null) {
+
+                                        Throwable cause =
+                                                unwrap(startError);
+
+                                        logger.error(
+                                                "Paper could not be started for {}: {}",
+                                                player.getUsername(),
+                                                cause.getMessage(),
+                                                cause
+                                        );
+
+                                        event.setResult(
+                                                ServerPreConnectEvent.ServerResult.denied()
+                                        );
+
+                                        player.sendMessage(
+                                                Component.text(
+                                                        "Paper could not be started. Please try again in a moment."
+                                                )
+                                        );
+
+                                        continuation.resume();
+                                        return;
+                                    }
+
+                                    logger.info(
+                                            "Paper is ready; allowing {} to connect.",
+                                            player.getUsername()
+                                    );
+
+                                    continuation.resume();
+                                }
+                        );
+            });
+        });
+    }
+
+    @Subscribe
+    public void onDisconnect(DisconnectEvent event) {
+
+        if (proxy.getAllPlayers().isEmpty()
+                && zeroPlayersSince == 0L) {
+
+            zeroPlayersSince =
+                    System.currentTimeMillis();
+        }
+    }
+
+    private void monitor() {
+
+        if (backend == null || api == null) {
+            return;
+        }
+
+        if (stopping.get()) {
+            return;
+        }
+
+        long players =
+                proxy.getAllPlayers()
+                        .stream()
+                        .filter(player ->
+                                player.getCurrentServer()
+                                        .map(connection ->
+                                                connection
+                                                        .getServerInfo()
+                                                        .getName()
+                                                        .equalsIgnoreCase(
+                                                                config.backendServer()
+                                                        )
+                                        )
+                                        .orElse(false)
+                        )
+                        .count();
+
+        /*
+         * Players are online.
+         */
+        if (players > 0) {
+
+            zeroPlayersSince = 0L;
+
+            return;
+        }
+
+        /*
+         * No players.
+         *
+         * Check that Paper is actually running.
+         */
+        backend.ping().whenComplete(
+                (ping, error) -> {
+
+                    if (error != null) {
+                        return;
+                    }
+
+                    if (zeroPlayersSince == 0L) {
+
+                        zeroPlayersSince =
+                                System.currentTimeMillis();
+
+                        logger.info(
+                                "No players connected to '{}'; idle timer started ({} minutes).",
+                                config.backendServer(),
+                                config.idleMinutes()
+                        );
+
+                        return;
+                    }
+
+                    long idleMillis =
+                            System.currentTimeMillis()
+                                    - zeroPlayersSince;
+
+                    long requiredMillis =
+                            Duration.ofMinutes(
+                                    config.idleMinutes()
+                            ).toMillis();
+
+                    if (idleMillis >= requiredMillis) {
+
+                        if (!stopping.compareAndSet(
+                                false,
+                                true
+                        )) {
+                            return;
+                        }
+
+                        zeroPlayersSince = 0L;
+
+                        saveThenStop();
+                    }
+                }
+        );
+    }
+
+    private CompletionStage<Void> ensureStartedAndReady() {
+
+        /*
+         * If another player is already starting Paper,
+         * wait for that same startup.
+         */
+        if (!starting.compareAndSet(false, true)) {
+            return waitForBackendReady();
+        }
+
+        logger.info(
+                "Paper backend is unreachable. Requesting Calagopus START..."
+        );
+
+        return api.power("start")
+                .thenCompose(
+                        ignored ->
+                                waitForBackendReady()
+                )
+                .whenComplete(
+                        (ignored, error) -> {
+
+                            starting.set(false);
+
+                            if (error != null) {
+
+                                logger.error(
+                                        "Paper failed to become reachable: {}",
+                                        unwrap(error).getMessage()
+                                );
+
+                            } else {
+
+                                logger.info(
+                                        "Paper backend is reachable again."
+                                );
+                            }
+                        }
+                );
+    }
+
+    private CompletionStage<Void> waitForBackendReady() {
+
+        CompletableFuture<Void> result =
+                new CompletableFuture<>();
+
+        long deadline =
+                System.nanoTime()
+                        + Duration.ofSeconds(
+                                config.startupTimeoutSeconds()
+                        ).toNanos();
+
+        pollBackend(
+                result,
+                deadline
+        );
+
+        return result;
+    }
+
+    private void pollBackend(
+            CompletableFuture<Void> result,
+            long deadline) {
+
+        if (result.isDone()) {
+            return;
+        }
+
+        backend.ping().whenComplete(
+                (ping, error) -> {
+
+                    if (error == null) {
+
+                        result.complete(null);
+                        return;
+                    }
+
+                    if (System.nanoTime() >= deadline) {
+
+                        result.completeExceptionally(
+                                new IOException(
+                                        "Timed out waiting for Paper backend after "
+                                                + config.startupTimeoutSeconds()
+                                                + " seconds"
+                                )
+                        );
+
+                        return;
+                    }
+
+                    proxy.getScheduler()
+                            .buildTask(
+                                    this,
+                                    () ->
+                                            pollBackend(
+                                                    result,
+                                                    deadline
+                                            )
+                            )
+                            .delay(
+                                    Duration.ofSeconds(
+                                            config.startupPollSeconds()
+                                    )
+                            )
+                            .schedule();
+                }
+        );
+    }
+
+    private void saveThenStop() {
+
+        CompletionStage<Void> chain =
+                CompletableFuture.completedFuture(null);
+
+        if (config.saveBeforeStop()) {
+
+            logger.info(
+                    "Idle timeout reached. Sending save-all before shutdown..."
+            );
+
+            chain =
+                    api.command("save-all");
+        }
+
+        chain
+                .thenCompose(
+                        ignored ->
+                                delay(
+                                        config.saveWaitSeconds()
+                                )
+                )
+                .thenCompose(
+                        ignored ->
+                                api.power("stop")
+                )
+                .whenComplete(
+                        (ignored, error) -> {
+
+                            stopping.set(false);
+
+                            if (error != null) {
+
+                                logger.error(
+                                        "Calagopus STOP failed: {}",
+                                        unwrap(error).getMessage(),
+                                        unwrap(error)
+                                );
+
+                            } else {
+
+                                logger.info(
+                                        "Calagopus STOP requested after {} minutes of inactivity.",
+                                        config.idleMinutes()
+                                );
+                            }
+                        }
+                );
+    }
+
+    private CompletionStage<Void> delay(
+            long seconds) {
+
+        CompletableFuture<Void> future =
+                new CompletableFuture<>();
+
+        proxy.getScheduler()
+                .buildTask(
+                        this,
+                        () -> future.complete(null)
+                )
+                .delay(
+                        Duration.ofSeconds(seconds)
+                )
+                .schedule();
+
+        return future;
+    }
+
+    private static Throwable unwrap(
+            Throwable throwable) {
+
+        Throwable t = throwable;
+
+        while (
+                (
+                        t instanceof
+                                java.util.concurrent.CompletionException
+                                ||
+                        t instanceof
+                                java.util.concurrent.ExecutionException
+                )
+                && t.getCause() != null
+        ) {
+            t = t.getCause();
+        }
+
+        return t;
+    }
+
+    private static final class Config {
+
+        private final Properties p;
+
+        private Config(Properties p) {
+            this.p = p;
+        }
+
+        static Config load(
+                Path dir,
+                Logger logger
+        ) throws IOException {
+
+            Files.createDirectories(dir);
+
+            Path file =
+                    dir.resolve(
+                            "config.properties"
+                    );
+
+            if (Files.notExists(file)) {
+
+                try (
+                        InputStream in =
+                                CalagopusAutoPower.class
+                                        .getResourceAsStream(
+                                                "/default.properties"
+                                        )
+                ) {
+
+                    if (in == null) {
+                        throw new IOException(
+                                "default.properties missing from plugin JAR"
+                        );
+                    }
+
+                    Files.copy(
+                            in,
+                            file
+                    );
+                }
+
+                logger.info(
+                        "Created default config at {}",
+                        file
+                );
+            }
+
+            Properties p =
+                    new Properties();
+
+            try (
+                    Reader reader =
+                            Files.newBufferedReader(
+                                    file,
+                                    StandardCharsets.UTF_8
+                            )
+            ) {
+                p.load(reader);
+            }
+
+            return new Config(p);
+        }
+
+        String calagopusUrl() {
+            return required(
+                    "calagopus.url"
+            ).replaceAll(
+                    "/$",
+                    ""
+            );
+        }
+
+        String serverUuid() {
+            return required(
+                    "calagopus.server-uuid"
+            );
+        }
+
+        String apiKeyEnv() {
+            return required(
+                    "calagopus.api-key-env"
+            );
+        }
+
+        String backendServer() {
+            return required(
+                    "backend-server"
+            );
+        }
+
+        int checkIntervalSeconds() {
+            return positiveInt(
+                    "check-interval-seconds"
+            );
+        }
+
+        int startupTimeoutSeconds() {
+            return positiveInt(
+                    "startup-timeout-seconds"
+            );
+        }
+
+        int startupPollSeconds() {
+            return positiveInt(
+                    "startup-poll-seconds"
+            );
+        }
+
+        int idleMinutes() {
+            return positiveInt(
+                    "idle-minutes"
+            );
+        }
+
+        int saveWaitSeconds() {
+            return nonNegativeInt(
+                    "save-wait-seconds"
+            );
+        }
+
+        boolean saveBeforeStop() {
+            return Boolean.parseBoolean(
+                    p.getProperty(
+                            "save-before-stop",
+                            "true"
+                    )
+            );
+        }
+
+        String startupMessage() {
+            return p.getProperty(
+                    "startup-message",
+                    "Paper is starting. Please wait..."
+            );
+        }
+
+        private String required(
+                String key) {
+
+            String value =
+                    p.getProperty(key);
+
+            if (
+                    value == null
+                            || value.isBlank()
+            ) {
+                throw new IllegalStateException(
+                        "Missing config: " + key
+                );
+            }
+
+            return value.trim();
+        }
+
+        private int positiveInt(
+                String key) {
+
+            int value =
+                    Integer.parseInt(
+                            required(key)
+                    );
+
+            if (value <= 0) {
+                throw new IllegalArgumentException(
+                        key + " must be > 0"
+                );
+            }
+
+            return value;
+        }
+
+        private int nonNegativeInt(
+                String key) {
+
+            int value =
+                    Integer.parseInt(
+                            required(key)
+                    );
+
+            if (value < 0) {
+                throw new IllegalArgumentException(
+                        key + " must be >= 0"
+                );
+            }
+
+            return value;
+        }
+    }
+
+    private static final class CalagopusClient {
+
+        private final HttpClient http;
+        private final String baseUrl;
+        private final String serverUuid;
+        private final String apiKey;
+
+        CalagopusClient(
+                HttpClient http,
+                String baseUrl,
+                String serverUuid,
+                String apiKey) {
+
+            this.http = http;
+            this.baseUrl = baseUrl;
+            this.serverUuid = serverUuid;
+            this.apiKey = apiKey;
+        }
+
+        CompletionStage<Void> power(
+                String signal) {
+
+            String json =
+                    "{\"signal\":\""
+                            + escape(signal)
+                            + "\"}";
+
+            return post(
+                    "/power",
+                    json
+            );
+        }
+
+        CompletionStage<Void> command(
+                String command) {
+
+            String json =
+                    "{\"command\":\""
+                            + escape(command)
+                            + "\"}";
+
+            return post(
+                    "/command",
+                    json
+            );
+        }
+
+        private CompletionStage<Void> post(
+                String path,
+                String json) {
+
+            HttpRequest request =
+                    HttpRequest.newBuilder()
+                            .uri(
+                                    URI.create(
+                                            baseUrl
+                                                    + "/api/client/servers/"
+                                                    + serverUuid
+                                                    + path
+                                    )
+                            )
+                            .timeout(
+                                    Duration.ofSeconds(15)
+                            )
+                            .header(
+                                    "Authorization",
+                                    "Bearer " + apiKey
+                            )
+                            .header(
+                                    "Accept",
+                                    "application/json"
+                            )
+                            .header(
+                                    "Content-Type",
+                                    "application/json"
+                            )
+                            .POST(
+                                    HttpRequest.BodyPublishers
+                                            .ofString(
+                                                    json,
+                                                    StandardCharsets.UTF_8
+                                            )
+                            )
+                            .build();
+
+            return http.sendAsync(
+                            request,
+                            HttpResponse.BodyHandlers
+                                    .ofString(
+                                            StandardCharsets.UTF_8
+                                    )
+                    )
+                    .thenCompose(
+                            response -> {
+
+                                int code =
+                                        response.statusCode();
+
+                                if (
+                                        code >= 200
+                                                && code < 300
+                                ) {
+                                    return CompletableFuture
+                                            .completedFuture(
+                                                    null
+                                            );
+                                }
+
+                                String body =
+                                        response.body();
+
+                                if (
+                                        body.length() > 500
+                                ) {
+                                    body =
+                                            body.substring(
+                                                    0,
+                                                    500
+                                            );
+                                }
+
+                                return CompletableFuture
+                                        .failedFuture(
+                                                new IOException(
+                                                        "Calagopus API "
+                                                                + code
+                                                                + " for "
+                                                                + path
+                                                                + ": "
+                                                                + body
+                                                )
+                                        );
+                            }
+                    );
+        }
+
+        private static String escape(
+                String value) {
+
+            return value
+                    .replace(
+                            "\\",
+                            "\\\\"
+                    )
+                    .replace(
+                            "\"",
+                            "\\\""
+                    );
+        }
+    }
+}
