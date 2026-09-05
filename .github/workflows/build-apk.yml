@@ -33,10 +33,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Check Java and Gradle
+        run: |
+          java -version
+          gradle --version
+
+      - name: Clean
+        run: |
+          gradle clean --console=plain
+
       - name: Build Debug APK
         run: |
-          gradle clean
-          gradle assembleDebug --stacktrace --console=plain
+          gradle assembleDebug --console=plain --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
