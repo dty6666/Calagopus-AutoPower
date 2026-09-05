@@ -19,7 +19,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -33,36 +33,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Compile Kotlin
-        id: compile
-        continue-on-error: true
-        run: |
-          gradle :app:compileDebugKotlin --console=plain 2>&1 | tee build.log
-          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
-
-      - name: Put compiler errors in Summary
-        if: always()
-        run: |
-          echo "# 🔴 Kotlin Build Diagnostics" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo '```text' >> "$GITHUB_STEP_SUMMARY"
-
-          grep -E \
-            "e: |error:|MainActivity\.kt:|ApiClient\.kt:|Unresolved reference|Type mismatch|Cannot access|Expecting" \
-            build.log \
-            | head -100 \
-            >> "$GITHUB_STEP_SUMMARY" || true
-
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Fail if Kotlin compilation failed
-        if: steps.compile.outputs.exit_code != '0'
-        run: |
-          echo "Kotlin compilation failed."
-          exit 1
-
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace
+        run: |
+          gradle clean
+          gradle assembleDebug --stacktrace --console=plain
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
